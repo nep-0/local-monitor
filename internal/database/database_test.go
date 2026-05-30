@@ -81,3 +81,44 @@ func TestGetLatestStatusesReturnsRecordedStatus(t *testing.T) {
 		t.Error("LastSeen is zero, want recorded timestamp")
 	}
 }
+
+func TestGetDeviceHistoryReturnsStatusChanges(t *testing.T) {
+	db := newTestDB(t)
+
+	deviceID, err := db.UpsertDevice("NAS", "192.168.1.100", "", "storage")
+	if err != nil {
+		t.Fatalf("UpsertDevice() error = %v", err)
+	}
+
+	baseTime := time.Now().UTC().Add(-time.Hour)
+	for i, online := range []bool{false, false, true, true, false} {
+		if err := recordStatusAt(db, deviceID, online, baseTime.Add(time.Duration(i)*time.Second)); err != nil {
+			t.Fatalf("recordStatusAt(%v) error = %v", online, err)
+		}
+	}
+
+	history, err := db.GetDeviceHistory("192.168.1.100", 10)
+	if err != nil {
+		t.Fatalf("GetDeviceHistory() error = %v", err)
+	}
+
+	if len(history) != 3 {
+		t.Fatalf("len(history) = %d, want 3", len(history))
+	}
+	want := []bool{false, true, false}
+	for i, status := range history {
+		if status.Online != want[i] {
+			t.Errorf("history[%d].Online = %v, want %v", i, status.Online, want[i])
+		}
+	}
+}
+
+func recordStatusAt(db *DB, deviceID int64, online bool, checkedAt time.Time) error {
+	_, err := db.conn.Exec(
+		`INSERT INTO device_status (device_id, online, checked_at) VALUES (?, ?, ?)`,
+		deviceID,
+		online,
+		checkedAt,
+	)
+	return err
+}

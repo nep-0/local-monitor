@@ -155,11 +155,16 @@ func (db *DB) GetLatestStatuses() ([]DeviceStatus, error) {
 func (db *DB) GetDeviceHistory(deviceIP string, limit int) ([]DeviceStatus, error) {
 	query := `
 	SELECT d.id, d.name, d.ip, d.mac, d.[groups],
-		ds.online, ds.last_seen, ds.checked_at
-	FROM device_status ds
-	JOIN devices d ON d.id = ds.device_id
+		h.online, h.last_seen, h.checked_at
+	FROM (
+		SELECT ds.device_id, ds.online, ds.last_seen, ds.checked_at,
+			LAG(ds.online) OVER (PARTITION BY ds.device_id ORDER BY ds.checked_at ASC, ds.id ASC) as previous_online
+		FROM device_status ds
+	) h
+	JOIN devices d ON d.id = h.device_id
 	WHERE d.ip = ?
-	ORDER BY ds.checked_at DESC
+		AND (h.previous_online IS NULL OR h.previous_online != h.online)
+	ORDER BY h.checked_at DESC
 	LIMIT ?
 	`
 
