@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"time"
 
-	_ "github.com/glebarez/go-sqlite"
+	_ "modernc.org/sqlite"
 )
 
 type DeviceStatus struct {
