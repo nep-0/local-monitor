@@ -40,7 +40,7 @@ h2 {
 
 .topbar p,
 .panel-header span,
-td.muted {
+.empty {
   color: #607086;
 }
 
@@ -82,7 +82,6 @@ main {
 }
 
 .metrics div,
-.device-panel,
 .timeline-panel,
 .history-panel {
   background: #ffffff;
@@ -106,7 +105,6 @@ main {
   font-size: 30px;
 }
 
-.device-panel,
 .timeline-panel,
 .history-panel {
   margin-top: 18px;
@@ -122,36 +120,13 @@ main {
   border-bottom: 1px solid #d9e0ea;
 }
 
-.table-wrap {
-  overflow-x: auto;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-th,
-td {
-  padding: 13px 18px;
-  border-bottom: 1px solid #edf1f5;
-  text-align: left;
-  white-space: nowrap;
-}
-
-th {
-  color: #607086;
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
-tr[data-ip] {
-  cursor: pointer;
-}
-
-tr[data-ip]:hover {
+.timeline-row[data-ip]:hover {
   background: #f7f9fc;
+}
+
+.selected-row,
+.timeline-row.selected-row {
+  background: #eef6ff;
 }
 
 .status {
@@ -196,24 +171,65 @@ tr[data-ip]:hover {
   background: #edf1f5;
 }
 
+.timeline-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 18px;
+  background: #f7f9fc;
+  color: #607086;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.timeline-group-header strong {
+  color: #18202b;
+  font-size: 12px;
+}
+
 .timeline-row {
   display: grid;
-  grid-template-columns: 190px 1fr;
-  gap: 18px;
+  grid-template-columns: 200px 92px minmax(480px, 1fr);
+  gap: 14px;
   align-items: center;
-  padding: 14px 18px;
+  min-height: 52px;
+  padding: 8px 18px;
   background: #ffffff;
+  font-size: 15px;
 }
 
-.timeline-row strong,
-.timeline-row span {
+.timeline-row[data-ip] {
+  cursor: pointer;
+}
+
+.timeline-identity {
+  overflow: hidden;
+  min-width: 0;
+}
+
+.timeline-identity strong,
+.timeline-identity span {
+  overflow: hidden;
   display: block;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.timeline-row div:first-child span {
+.timeline-identity strong {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.timeline-identity span {
   margin-top: 3px;
   color: #607086;
-  font-size: 13px;
+  font-size: 12px;
+}
+
+.timeline-row .status {
+  font-size: 15px;
 }
 
 .timeline-track,
@@ -221,13 +237,13 @@ tr[data-ip]:hover {
   position: relative;
   display: block;
   width: 100%;
-  min-height: 34px;
-  border-radius: 6px;
+  min-height: 24px;
+  border-radius: 4px;
   background: linear-gradient(90deg, #edf1f5, #e4eaf1);
 }
 
 .timeline-svg {
-  height: 34px;
+  height: 24px;
 }
 
 .unknown-block {
@@ -277,7 +293,7 @@ tr[data-ip]:hover {
   }
 
   .timeline-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(120px, 1fr) 82px minmax(180px, 2fr);
     gap: 10px;
   }
 
