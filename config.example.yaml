@@ -1,0 +1,57 @@
+# Local Monitor Configuration
+# See config.example.yaml for full documentation
+
+database:
+  path: "local-monitor.db"
+
+monitor:
+  # How often to check devices (Go duration format)
+  interval: 60s
+  
+  # Timeout for each ARP request
+  timeout: 2s
+  
+  # Network interface to use for ARP queries
+  # Run 'ip link' or 'ifconfig' to see available interfaces
+  interface: "eth0"
+  
+  # Number of concurrent ARP workers
+  workers: 10
+  
+  # Number of retry attempts per device
+  retry_count: 3
+  
+  # Delay between retries
+  retry_delay: 1s
+  
+  # Run initial probe on startup
+  startup_probe: true
+  
+  # Delay before first probe (allows network to initialize)
+  startup_delay: 5s
+
+logging:
+  # Log level: debug, info, warn, error
+  level: "info"
+  
+  # Log format: text, json
+  format: "text"
+
+# Devices to monitor
+devices:
+  - name: "Router"
+    ip: "192.168.1.1"
+    mac: "aa:bb:cc:dd:ee:f1"  # Optional, for verification
+    group: "network"
+  
+  - name: "NAS"
+    ip: "192.168.1.100"
+    group: "storage"
+  
+  - name: "Desktop"
+    ip: "192.168.1.50"
+    group: "computers"
+  
+  - name: "Printer"
+    ip: "192.168.1.200"
+    group: "peripherals"
