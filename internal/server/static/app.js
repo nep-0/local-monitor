@@ -101,7 +101,7 @@ function renderTimeline(timeline) {
       const end = clamp(((new Date(entry.end).getTime() - since) / span) * 100, 0, 100);
       const width = Math.max(end - start, 0.4);
       const title = `${entry.online ? "Online" : "Offline"} from ${formatDate(entry.start)} to ${formatDate(entry.end)}`;
-      return `<rect x="${start.toFixed(3)}" y="3" width="${width.toFixed(3)}" height="18" rx="2" class="${entry.online ? "online-block" : "offline-block"}"><title>${escapeHTML(title)}</title></rect>`;
+      return `<rect x="${start.toFixed(3)}" y="3" width="${width.toFixed(3)}" height="18" class="${entry.online ? "online-block" : "offline-block"}"><title>${escapeHTML(title)}</title></rect>`;
     }).join("");
 
     return `
@@ -159,7 +159,7 @@ function renderTimelineSVG(device, blocks) {
   }
   return `
     <svg class="timeline-svg" viewBox="0 0 100 24" preserveAspectRatio="none" role="img" aria-label="${escapeHTML(device.name)} 7-day status timeline">
-      <rect x="0" y="3" width="100" height="18" rx="2" class="unknown-block"></rect>
+      <rect x="0" y="3" width="100" height="18" class="unknown-block"></rect>
       ${blocks}
     </svg>
   `;
