@@ -3,17 +3,27 @@ const lastUpdated = document.querySelector("#last-updated");
 const totalCount = document.querySelector("#total-count");
 const onlineCount = document.querySelector("#online-count");
 const offlineCount = document.querySelector("#offline-count");
+const timelineTitle = document.querySelector("#timeline-title");
 const timelineRange = document.querySelector("#timeline-range");
 const timelineList = document.querySelector("#timeline-list");
+const timelineScopeButtons = document.querySelectorAll(".timeline-scope button[data-days]");
 const historyTitle = document.querySelector("#history-title");
 const historyList = document.querySelector("#history-list");
 const refreshButton = document.querySelector("#refresh");
 const probeButton = document.querySelector("#probe");
 
 let selectedIP = "";
+let timelineDays = 7;
 
 refreshButton.addEventListener("click", loadStatuses);
 probeButton.addEventListener("click", runProbe);
+timelineScopeButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    timelineDays = Number(button.dataset.days);
+    setTimelineScope(timelineDays);
+    loadStatuses();
+  });
+});
 
 async function loadStatuses() {
   setBusy(refreshButton, true);
@@ -42,7 +52,7 @@ async function runProbe() {
 }
 
 async function loadTimeline() {
-  const timeline = await fetchJSON("/api/timeline?days=7");
+  const timeline = await fetchJSON(`/api/timeline?days=${timelineDays}`);
   renderTimeline(timeline);
 }
 
@@ -59,6 +69,7 @@ async function loadHistory(ip) {
 }
 
 function renderTimeline(timeline) {
+  timelineTitle.textContent = `${formatScopeLabel(timelineDays)} Timeline`;
   timelineRange.textContent = `${formatShortDate(timeline.since)} - ${formatShortDate(timeline.until)}`;
   lastUpdated.textContent = ` / Updated ${formatDate(new Date().toISOString())}`;
   const online = timeline.devices.filter((device) => device.online).length;
@@ -109,6 +120,12 @@ function renderTimeline(timeline) {
   document.querySelectorAll(".timeline-row[data-ip]").forEach((row) => {
     row.classList.toggle("selected-row", row.dataset.ip === selectedIP);
     row.addEventListener("click", () => selectDevice(row.dataset.ip));
+  });
+}
+
+function setTimelineScope(days) {
+  timelineScopeButtons.forEach((button) => {
+    button.classList.toggle("active", Number(button.dataset.days) === days);
   });
 }
 
@@ -186,6 +203,13 @@ function formatShortDate(value) {
     month: "short",
     day: "numeric",
   }).format(new Date(value));
+}
+
+function formatScopeLabel(days) {
+  if (days === 1) {
+    return "1-Day";
+  }
+  return `${days}-Day`;
 }
 
 function clamp(value, min, max) {

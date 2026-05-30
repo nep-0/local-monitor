@@ -36,8 +36,17 @@
 
     <section class="timeline-panel">
       <div class="panel-header">
-        <h2>7-Day Timeline</h2>
-        <span><span id="timeline-range"></span><span id="last-updated"></span></span>
+        <div>
+          <h2 id="timeline-title">7-Day Timeline</h2>
+          <span><span id="timeline-range"></span><span id="last-updated"></span></span>
+        </div>
+        <div class="timeline-scope" aria-label="Timeline scope">
+          <button type="button" data-days="1">1d</button>
+          <button type="button" data-days="3">3d</button>
+          <button type="button" data-days="7" class="active">7d</button>
+          <button type="button" data-days="14">14d</button>
+          <button type="button" data-days="30">30d</button>
+        </div>
       </div>
       <div id="timeline-list" class="timeline-list"></div>
     </section>
