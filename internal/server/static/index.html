@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Local Monitor</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>Local Monitor</h1>
+      <p id="summary">Loading devices...</p>
+    </div>
+    <div class="actions">
+      <button id="refresh" type="button">Refresh</button>
+      <button id="probe" type="button">Run Probe</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="metrics" aria-label="Device summary">
+      <div>
+        <span>Total</span>
+        <strong id="total-count">0</strong>
+      </div>
+      <div>
+        <span>Online</span>
+        <strong id="online-count">0</strong>
+      </div>
+      <div>
+        <span>Offline</span>
+        <strong id="offline-count">0</strong>
+      </div>
+    </section>
+
+    <section class="device-panel">
+      <div class="panel-header">
+        <h2>Devices</h2>
+        <span id="last-updated"></span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>IP</th>
+              <th>Group</th>
+              <th>Status</th>
+              <th>Last Seen</th>
+              <th>Checked</th>
+            </tr>
+          </thead>
+          <tbody id="device-rows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="history-panel">
+      <div class="panel-header">
+        <h2 id="history-title">History</h2>
+      </div>
+      <div id="history-list" class="history-list"></div>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -10,6 +10,7 @@ import (
 type Config struct {
 	Database DatabaseConfig `yaml:"database"`
 	Monitor  MonitorConfig  `yaml:"monitor"`
+	Server   ServerConfig   `yaml:"server"`
 	Devices  []Device       `yaml:"devices"`
 	Logging  LoggingConfig  `yaml:"logging"`
 }
@@ -19,21 +20,26 @@ type DatabaseConfig struct {
 }
 
 type MonitorConfig struct {
-	Interval       time.Duration `yaml:"interval"`
-	Timeout        time.Duration `yaml:"timeout"`
-	Interface      string        `yaml:"interface"`
-	Workers        int           `yaml:"workers"`
-	RetryCount     int           `yaml:"retry_count"`
-	RetryDelay     time.Duration `yaml:"retry_delay"`
-	StartupProbe   bool          `yaml:"startup_probe"`
-	StartupDelay   time.Duration `yaml:"startup_delay"`
+	Interval     time.Duration `yaml:"interval"`
+	Timeout      time.Duration `yaml:"timeout"`
+	Interface    string        `yaml:"interface"`
+	Workers      int           `yaml:"workers"`
+	RetryCount   int           `yaml:"retry_count"`
+	RetryDelay   time.Duration `yaml:"retry_delay"`
+	StartupProbe bool          `yaml:"startup_probe"`
+	StartupDelay time.Duration `yaml:"startup_delay"`
+}
+
+type ServerConfig struct {
+	Enabled bool   `yaml:"enabled"`
+	Listen  string `yaml:"listen"`
 }
 
 type Device struct {
-	Name   string `yaml:"name"`
-	IP     string `yaml:"ip"`
-	MAC    string `yaml:"mac,omitempty"`
-	Group  string `yaml:"group,omitempty"`
+	Name  string `yaml:"name"`
+	IP    string `yaml:"ip"`
+	MAC   string `yaml:"mac,omitempty"`
+	Group string `yaml:"group,omitempty"`
 }
 
 type LoggingConfig struct {
@@ -64,6 +70,10 @@ func Load(path string) (*Config, error) {
 			Level:  "info",
 			Format: "text",
 		},
+		Server: ServerConfig{
+			Enabled: false,
+			Listen:  ":8080",
+		},
 	}
 
 	if err := yaml.Unmarshal(data, cfg); err != nil {
@@ -90,6 +100,10 @@ func DefaultConfig() *Config {
 		Logging: LoggingConfig{
 			Level:  "info",
 			Format: "text",
+		},
+		Server: ServerConfig{
+			Enabled: false,
+			Listen:  ":8080",
 		},
 	}
 }

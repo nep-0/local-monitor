@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"strings"
@@ -15,6 +16,7 @@ import (
 	"local-monitor/internal/config"
 	"local-monitor/internal/database"
 	"local-monitor/internal/monitor"
+	"local-monitor/internal/server"
 )
 
 var (
@@ -29,6 +31,8 @@ func main() {
 		showStatus  bool
 		probeOnce   bool
 		jsonOutput  bool
+		serve       bool
+		listenAddr  string
 		cleanupDays int
 	)
 
@@ -37,6 +41,8 @@ func main() {
 	flag.BoolVar(&showStatus, "status", false, "Show current device statuses")
 	flag.BoolVar(&probeOnce, "probe", false, "Run a single probe and exit")
 	flag.BoolVar(&jsonOutput, "json", false, "Output in JSON format")
+	flag.BoolVar(&serve, "serve", false, "Start REST API and web dashboard")
+	flag.StringVar(&listenAddr, "listen", "", "Override HTTP listen address from config")
 	flag.IntVar(&cleanupDays, "cleanup", 0, "Cleanup records older than N days (0 = disabled)")
 	flag.Parse()
 
@@ -54,6 +60,12 @@ func main() {
 
 	// Setup logger
 	logger := setupLogger(cfg.Logging)
+	if serve {
+		cfg.Server.Enabled = true
+	}
+	if listenAddr != "" {
+		cfg.Server.Listen = listenAddr
+	}
 
 	// Initialize database
 	db, err := database.New(cfg.Database.Path)
@@ -108,6 +120,11 @@ func main() {
 		if _, err := db.UpsertDevice(dev.Name, dev.IP.String(), macStr, dev.Group); err != nil {
 			logger.Error("Failed to upsert device", "device", dev.Name, "error", err)
 		}
+	}
+
+	if cfg.Server.Enabled {
+		runServer(cfg, db, devices, logger, cfg.Server.Listen)
+		return
 	}
 
 	// Single probe mode
@@ -181,7 +198,6 @@ func runMonitor(cfg *config.Config, db *database.DB, devices []monitor.Device, l
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Handle shutdown signals
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
@@ -190,10 +206,18 @@ func runMonitor(cfg *config.Config, db *database.DB, devices []monitor.Device, l
 		cancel()
 	}()
 
+	runMonitorLoop(ctx, cfg, db, devices, m, logger)
+}
+
+func runMonitorLoop(ctx context.Context, cfg *config.Config, db *database.DB, devices []monitor.Device, m *monitor.Monitor, logger *slog.Logger) {
 	// Startup probe
 	if cfg.Monitor.StartupProbe {
 		logger.Info("Running startup probe", "delay", cfg.Monitor.StartupDelay)
-		time.Sleep(cfg.Monitor.StartupDelay)
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(cfg.Monitor.StartupDelay):
+		}
 		results := m.Probe(ctx, devices)
 		processResults(db, results, logger)
 	}
@@ -216,6 +240,46 @@ func runMonitor(cfg *config.Config, db *database.DB, devices []monitor.Device, l
 			results := m.Probe(ctx, devices)
 			processResults(db, results, logger)
 		}
+	}
+}
+
+func runServer(cfg *config.Config, db *database.DB, devices []monitor.Device, logger *slog.Logger, listenAddr string) {
+	m, err := monitor.New(cfg.Monitor.Interface, cfg.Monitor.Timeout,
+		cfg.Monitor.RetryCount, cfg.Monitor.RetryDelay, logger)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		sig := <-sigCh
+		logger.Info("Received shutdown signal", "signal", sig)
+		cancel()
+	}()
+
+	if err != nil {
+		logger.Warn("Probe endpoint and background monitoring disabled", "error", err)
+	} else {
+		go runMonitorLoop(ctx, cfg, db, devices, m, logger)
+	}
+
+	srv := server.New(db, m, devices, logger)
+	httpServer := srv.HTTPServer(listenAddr)
+
+	go func() {
+		<-ctx.Done()
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer shutdownCancel()
+		if err := httpServer.Shutdown(shutdownCtx); err != nil {
+			logger.Error("Failed to stop HTTP server", "error", err)
+		}
+	}()
+
+	logger.Info("Starting REST API and dashboard", "addr", listenAddr, "url", server.LocalURL(listenAddr))
+	if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		logger.Error("HTTP server stopped", "error", err)
+		os.Exit(1)
 	}
 }
 

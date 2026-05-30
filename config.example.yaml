@@ -37,6 +37,13 @@ logging:
   # Log format: text, json
   format: "text"
 
+server:
+  # Start the REST API and web dashboard
+  enabled: false
+  
+  # HTTP listen address for the dashboard and API
+  listen: ":8080"
+
 # Devices to monitor
 devices:
   - name: "Router"

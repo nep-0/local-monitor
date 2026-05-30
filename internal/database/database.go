@@ -76,12 +76,17 @@ func (db *DB) UpsertDevice(name, ip, mac, group string) (int64, error) {
 		name = excluded.name,
 		mac = excluded.mac,
 		[groups] = excluded.[groups]
+	RETURNING id
 	`
-	result, err := db.conn.Exec(query, name, ip, mac, group)
-	if err != nil {
-		return 0, err
-	}
-	return result.LastInsertId()
+	var id int64
+	err := db.conn.QueryRow(query, name, ip, mac, group).Scan(&id)
+	return id, err
+}
+
+func (db *DB) GetDeviceIDByIP(ip string) (int64, error) {
+	var id int64
+	err := db.conn.QueryRow(`SELECT id FROM devices WHERE ip = ?`, ip).Scan(&id)
+	return id, err
 }
 
 func (db *DB) RecordStatus(deviceID int64, online bool, lastSeen *time.Time) error {
