@@ -113,6 +113,35 @@ func TestGetDeviceHistoryReturnsStatusChanges(t *testing.T) {
 	}
 }
 
+func TestGetStatusesSince(t *testing.T) {
+	db := newTestDB(t)
+
+	deviceID, err := db.UpsertDevice("Router", "192.168.1.1", "", "network")
+	if err != nil {
+		t.Fatalf("UpsertDevice() error = %v", err)
+	}
+
+	baseTime := time.Now().UTC().Add(-2 * time.Hour)
+	if err := recordStatusAt(db, deviceID, false, baseTime); err != nil {
+		t.Fatalf("recordStatusAt(false) error = %v", err)
+	}
+	if err := recordStatusAt(db, deviceID, true, baseTime.Add(time.Hour)); err != nil {
+		t.Fatalf("recordStatusAt(true) error = %v", err)
+	}
+
+	statuses, err := db.GetStatusesSince(baseTime.Add(30 * time.Minute))
+	if err != nil {
+		t.Fatalf("GetStatusesSince() error = %v", err)
+	}
+
+	if len(statuses) != 1 {
+		t.Fatalf("len(statuses) = %d, want 1", len(statuses))
+	}
+	if !statuses[0].Online {
+		t.Error("Online = false, want true")
+	}
+}
+
 func recordStatusAt(db *DB, deviceID int64, online bool, checkedAt time.Time) error {
 	_, err := db.conn.Exec(
 		`INSERT INTO device_status (device_id, online, checked_at) VALUES (?, ?, ?)`,

@@ -205,6 +205,53 @@ func (db *DB) GetDeviceHistory(deviceIP string, limit int) ([]DeviceStatus, erro
 	return history, rows.Err()
 }
 
+func (db *DB) GetStatusesSince(since time.Time) ([]DeviceStatus, error) {
+	query := `
+	SELECT d.id, d.name, d.ip, d.mac, d.[groups],
+		ds.online, ds.last_seen, ds.checked_at
+	FROM device_status ds
+	JOIN devices d ON d.id = ds.device_id
+	WHERE ds.checked_at >= ?
+	ORDER BY d.name, ds.checked_at ASC, ds.id ASC
+	`
+
+	rows, err := db.conn.Query(query, since)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var statuses []DeviceStatus
+	for rows.Next() {
+		var s DeviceStatus
+		var mac, group sql.NullString
+		var lastSeen, checkedAt sql.NullTime
+
+		err := rows.Scan(&s.ID, &s.Name, &s.IP, &mac, &group,
+			&s.Online, &lastSeen, &checkedAt)
+		if err != nil {
+			return nil, err
+		}
+
+		if mac.Valid {
+			s.MAC = mac.String
+		}
+		if group.Valid {
+			s.Group = group.String
+		}
+		if lastSeen.Valid {
+			s.LastSeen = lastSeen.Time
+		}
+		if checkedAt.Valid {
+			s.CheckedAt = checkedAt.Time
+		}
+
+		statuses = append(statuses, s)
+	}
+
+	return statuses, rows.Err()
+}
+
 func (db *DB) CleanupOldRecords(olderThan time.Duration) (int64, error) {
 	query := `DELETE FROM device_status WHERE checked_at < ?`
 	result, err := db.conn.Exec(query, time.Now().Add(-olderThan))

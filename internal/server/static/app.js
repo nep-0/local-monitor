@@ -4,6 +4,8 @@ const lastUpdated = document.querySelector("#last-updated");
 const totalCount = document.querySelector("#total-count");
 const onlineCount = document.querySelector("#online-count");
 const offlineCount = document.querySelector("#offline-count");
+const timelineRange = document.querySelector("#timeline-range");
+const timelineList = document.querySelector("#timeline-list");
 const historyTitle = document.querySelector("#history-title");
 const historyList = document.querySelector("#history-list");
 const refreshButton = document.querySelector("#refresh");
@@ -19,6 +21,7 @@ async function loadStatuses() {
   try {
     const devices = await fetchJSON("/api/statuses");
     renderStatuses(devices);
+    await loadTimeline();
   } catch (error) {
     showError(error.message);
   } finally {
@@ -39,6 +42,11 @@ async function runProbe() {
   } finally {
     setBusy(probeButton, false);
   }
+}
+
+async function loadTimeline() {
+  const timeline = await fetchJSON("/api/timeline?days=7");
+  renderTimeline(timeline);
 }
 
 async function loadHistory(ip) {
@@ -84,6 +92,39 @@ function renderStatuses(devices) {
   });
 }
 
+function renderTimeline(timeline) {
+  timelineRange.textContent = `${formatShortDate(timeline.since)} - ${formatShortDate(timeline.until)}`;
+  if (timeline.devices.length === 0) {
+    timelineList.innerHTML = `<div class="empty">No timeline data available.</div>`;
+    return;
+  }
+
+  const since = new Date(timeline.since).getTime();
+  const until = new Date(timeline.until).getTime();
+  const span = Math.max(until - since, 1);
+
+  timelineList.innerHTML = timeline.devices.map((device) => {
+    const markers = device.samples.map((sample) => {
+      const checkedAt = new Date(sample.checked_at).getTime();
+      const left = clamp(((checkedAt - since) / span) * 100, 0, 100);
+      const title = `${sample.online ? "Online" : "Offline"} at ${formatDate(sample.checked_at)}`;
+      return `<span class="timeline-marker ${sample.online ? "online-dot" : "offline-dot"}" style="left:${left}%" title="${escapeHTML(title)}"></span>`;
+    }).join("");
+
+    return `
+      <div class="timeline-row">
+        <div>
+          <strong>${escapeHTML(device.name)}</strong>
+          <span>${escapeHTML(device.ip)}</span>
+        </div>
+        <div class="timeline-track" aria-label="${escapeHTML(device.name)} 7-day status timeline">
+          ${markers || `<span class="timeline-empty">No samples</span>`}
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
 function renderHistory(history) {
   if (history.length === 0) {
     historyList.innerHTML = `<div class="empty">No status history recorded for this device.</div>`;
@@ -115,6 +156,17 @@ function formatDate(value) {
     dateStyle: "medium",
     timeStyle: "medium",
   }).format(new Date(value));
+}
+
+function formatShortDate(value) {
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+  }).format(new Date(value));
+}
+
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
 }
 
 function setBusy(button, busy) {

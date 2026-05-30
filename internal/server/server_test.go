@@ -17,6 +17,7 @@ import (
 type fakeStore struct {
 	statuses []database.DeviceStatus
 	history  []database.DeviceStatus
+	samples  []database.DeviceStatus
 	deviceID int64
 	recorded int
 }
@@ -27,6 +28,10 @@ func (f *fakeStore) GetLatestStatuses() ([]database.DeviceStatus, error) {
 
 func (f *fakeStore) GetDeviceHistory(string, int) ([]database.DeviceStatus, error) {
 	return f.history, nil
+}
+
+func (f *fakeStore) GetStatusesSince(time.Time) ([]database.DeviceStatus, error) {
+	return f.samples, nil
 }
 
 func (f *fakeStore) GetDeviceIDByIP(string) (int64, error) {
@@ -104,5 +109,38 @@ func TestProbeEndpointUnavailableWithoutProber(t *testing.T) {
 
 	if rec.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusServiceUnavailable)
+	}
+}
+
+func TestTimelineEndpoint(t *testing.T) {
+	checkedAt := time.Now().UTC()
+	store := &fakeStore{
+		statuses: []database.DeviceStatus{
+			{ID: 1, Name: "Router", IP: "192.168.1.1", Group: "network", Online: true},
+		},
+		samples: []database.DeviceStatus{
+			{ID: 1, Name: "Router", IP: "192.168.1.1", Online: false, CheckedAt: checkedAt.Add(-time.Hour)},
+			{ID: 1, Name: "Router", IP: "192.168.1.1", Online: true, CheckedAt: checkedAt},
+		},
+	}
+	srv := New(store, nil, nil, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/timeline?days=7", nil)
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	var got timelineResponse
+	if err := json.NewDecoder(rec.Body).Decode(&got); err != nil {
+		t.Fatalf("Decode() error = %v", err)
+	}
+	if len(got.Devices) != 1 {
+		t.Fatalf("len(got.Devices) = %d, want 1", len(got.Devices))
+	}
+	if len(got.Devices[0].Samples) != 2 {
+		t.Fatalf("len(got.Devices[0].Samples) = %d, want 2", len(got.Devices[0].Samples))
 	}
 }
