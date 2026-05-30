@@ -125,10 +125,11 @@ func (s *Server) handleTimeline(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	until := time.Now()
 	response := timelineResponse{
 		Since:   since,
-		Until:   time.Now(),
-		Devices: buildTimelineDevices(latest, samples),
+		Until:   until,
+		Devices: buildTimelineDevices(latest, samples, since, until),
 	}
 	writeJSON(w, http.StatusOK, response)
 }
@@ -239,20 +240,21 @@ type timelineResponse struct {
 }
 
 type timelineDevice struct {
-	ID      int64            `json:"id"`
-	Name    string           `json:"name"`
-	IP      string           `json:"ip"`
-	Group   string           `json:"group"`
-	Online  bool             `json:"online"`
-	Samples []timelineSample `json:"samples"`
+	ID      int64           `json:"id"`
+	Name    string          `json:"name"`
+	IP      string          `json:"ip"`
+	Group   string          `json:"group"`
+	Online  bool            `json:"online"`
+	Entries []timelineEntry `json:"entries"`
 }
 
-type timelineSample struct {
-	Online    bool      `json:"online"`
-	CheckedAt time.Time `json:"checked_at"`
+type timelineEntry struct {
+	Online bool      `json:"online"`
+	Start  time.Time `json:"start"`
+	End    time.Time `json:"end"`
 }
 
-func buildTimelineDevices(latest []database.DeviceStatus, samples []database.DeviceStatus) []timelineDevice {
+func buildTimelineDevices(latest []database.DeviceStatus, transitions []database.DeviceStatus, since, until time.Time) []timelineDevice {
 	byIP := make(map[string]*timelineDevice, len(latest))
 	devices := make([]timelineDevice, 0, len(latest))
 	for _, status := range latest {
@@ -266,15 +268,32 @@ func buildTimelineDevices(latest []database.DeviceStatus, samples []database.Dev
 		byIP[status.IP] = &devices[len(devices)-1]
 	}
 
-	for _, sample := range samples {
-		device, ok := byIP[sample.IP]
+	for i, transition := range transitions {
+		device, ok := byIP[transition.IP]
 		if !ok {
 			continue
 		}
-		device.Samples = append(device.Samples, timelineSample{
-			Online:    sample.Online,
-			CheckedAt: sample.CheckedAt,
-		})
+		start := transition.CheckedAt
+		if start.Before(since) {
+			start = since
+		}
+		end := until
+		for _, next := range transitions[i+1:] {
+			if next.IP == transition.IP {
+				end = next.CheckedAt
+				break
+			}
+		}
+		if end.After(until) {
+			end = until
+		}
+		if end.After(start) {
+			device.Entries = append(device.Entries, timelineEntry{
+				Online: transition.Online,
+				Start:  start,
+				End:    end,
+			})
+		}
 	}
 
 	return devices

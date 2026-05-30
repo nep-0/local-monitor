@@ -104,11 +104,12 @@ function renderTimeline(timeline) {
   const span = Math.max(until - since, 1);
 
   timelineList.innerHTML = timeline.devices.map((device) => {
-    const markers = device.samples.map((sample) => {
-      const checkedAt = new Date(sample.checked_at).getTime();
-      const left = clamp(((checkedAt - since) / span) * 100, 0, 100);
-      const title = `${sample.online ? "Online" : "Offline"} at ${formatDate(sample.checked_at)}`;
-      return `<span class="timeline-marker ${sample.online ? "online-dot" : "offline-dot"}" style="left:${left}%" title="${escapeHTML(title)}"></span>`;
+    const blocks = device.entries.map((entry) => {
+      const start = clamp(((new Date(entry.start).getTime() - since) / span) * 100, 0, 100);
+      const end = clamp(((new Date(entry.end).getTime() - since) / span) * 100, 0, 100);
+      const width = Math.max(end - start, 0.4);
+      const title = `${entry.online ? "Online" : "Offline"} from ${formatDate(entry.start)} to ${formatDate(entry.end)}`;
+      return `<rect x="${start.toFixed(3)}" y="5" width="${width.toFixed(3)}" height="18" rx="2" class="${entry.online ? "online-block" : "offline-block"}"><title>${escapeHTML(title)}</title></rect>`;
     }).join("");
 
     return `
@@ -117,12 +118,22 @@ function renderTimeline(timeline) {
           <strong>${escapeHTML(device.name)}</strong>
           <span>${escapeHTML(device.ip)}</span>
         </div>
-        <div class="timeline-track" aria-label="${escapeHTML(device.name)} 7-day status timeline">
-          ${markers || `<span class="timeline-empty">No samples</span>`}
-        </div>
+        ${renderTimelineSVG(device, blocks)}
       </div>
     `;
   }).join("");
+}
+
+function renderTimelineSVG(device, blocks) {
+  if (!blocks) {
+    return `<div class="timeline-track"><span class="timeline-empty">No entries</span></div>`;
+  }
+  return `
+    <svg class="timeline-svg" viewBox="0 0 100 28" preserveAspectRatio="none" role="img" aria-label="${escapeHTML(device.name)} 7-day status timeline">
+      <rect x="0" y="5" width="100" height="18" rx="2" class="unknown-block"></rect>
+      ${blocks}
+    </svg>
+  `;
 }
 
 function renderHistory(history) {

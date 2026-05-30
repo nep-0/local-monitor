@@ -113,7 +113,7 @@ func TestProbeEndpointUnavailableWithoutProber(t *testing.T) {
 }
 
 func TestTimelineEndpoint(t *testing.T) {
-	checkedAt := time.Now().UTC()
+	checkedAt := time.Now().UTC().Add(-time.Hour)
 	store := &fakeStore{
 		statuses: []database.DeviceStatus{
 			{ID: 1, Name: "Router", IP: "192.168.1.1", Group: "network", Online: true},
@@ -140,7 +140,7 @@ func TestTimelineEndpoint(t *testing.T) {
 	if len(got.Devices) != 1 {
 		t.Fatalf("len(got.Devices) = %d, want 1", len(got.Devices))
 	}
-	if len(got.Devices[0].Samples) != 2 {
-		t.Fatalf("len(got.Devices[0].Samples) = %d, want 2", len(got.Devices[0].Samples))
+	if len(got.Devices[0].Entries) != 2 {
+		t.Fatalf("len(got.Devices[0].Entries) = %d, want 2", len(got.Devices[0].Entries))
 	}
 }

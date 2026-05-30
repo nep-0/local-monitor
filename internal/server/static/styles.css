@@ -216,40 +216,30 @@ tr[data-ip]:hover {
   font-size: 13px;
 }
 
-.timeline-track {
+.timeline-track,
+.timeline-svg {
   position: relative;
+  display: block;
+  width: 100%;
   min-height: 34px;
   border-radius: 6px;
   background: linear-gradient(90deg, #edf1f5, #e4eaf1);
 }
 
-.timeline-track::before {
-  position: absolute;
-  top: 50%;
-  right: 8px;
-  left: 8px;
-  height: 2px;
-  background: #c6d0dc;
-  content: "";
+.timeline-svg {
+  height: 34px;
 }
 
-.timeline-marker {
-  position: absolute;
-  top: 50%;
-  width: 12px;
-  height: 12px;
-  border: 2px solid #ffffff;
-  border-radius: 50%;
-  box-shadow: 0 0 0 1px rgba(24, 32, 43, 0.16);
-  transform: translate(-50%, -50%);
+.unknown-block {
+  fill: #dbe3ec;
 }
 
-.online-dot {
-  background: #20b26b;
+.online-block {
+  fill: #20b26b;
 }
 
-.offline-dot {
-  background: #db4b4b;
+.offline-block {
+  fill: #db4b4b;
 }
 
 .timeline-empty {

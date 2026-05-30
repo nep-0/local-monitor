@@ -134,11 +134,14 @@ func TestGetStatusesSince(t *testing.T) {
 		t.Fatalf("GetStatusesSince() error = %v", err)
 	}
 
-	if len(statuses) != 1 {
-		t.Fatalf("len(statuses) = %d, want 1", len(statuses))
+	if len(statuses) != 2 {
+		t.Fatalf("len(statuses) = %d, want 2", len(statuses))
 	}
-	if !statuses[0].Online {
-		t.Error("Online = false, want true")
+	if statuses[0].Online {
+		t.Error("statuses[0].Online = true, want false for pre-window state")
+	}
+	if !statuses[1].Online {
+		t.Error("statuses[1].Online = false, want true for in-window transition")
 	}
 }
 

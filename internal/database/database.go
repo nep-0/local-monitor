@@ -207,15 +207,35 @@ func (db *DB) GetDeviceHistory(deviceIP string, limit int) ([]DeviceStatus, erro
 
 func (db *DB) GetStatusesSince(since time.Time) ([]DeviceStatus, error) {
 	query := `
+	WITH timeline AS (
+		SELECT device_id, online, last_seen, checked_at
+		FROM (
+			SELECT ds.device_id, ds.online, ds.last_seen, ds.checked_at,
+				ROW_NUMBER() OVER (PARTITION BY ds.device_id ORDER BY ds.checked_at DESC, ds.id DESC) as rn
+			FROM device_status ds
+			WHERE ds.checked_at < ?
+		)
+		WHERE rn = 1
+
+		UNION ALL
+
+		SELECT device_id, online, last_seen, checked_at
+		FROM (
+			SELECT ds.device_id, ds.online, ds.last_seen, ds.checked_at,
+				LAG(ds.online) OVER (PARTITION BY ds.device_id ORDER BY ds.checked_at ASC, ds.id ASC) as previous_online
+			FROM device_status ds
+		)
+		WHERE checked_at >= ?
+			AND (previous_online IS NULL OR previous_online != online)
+	)
 	SELECT d.id, d.name, d.ip, d.mac, d.[groups],
-		ds.online, ds.last_seen, ds.checked_at
-	FROM device_status ds
-	JOIN devices d ON d.id = ds.device_id
-	WHERE ds.checked_at >= ?
-	ORDER BY d.name, ds.checked_at ASC, ds.id ASC
+		t.online, t.last_seen, t.checked_at
+	FROM timeline t
+	JOIN devices d ON d.id = t.device_id
+	ORDER BY d.name, t.checked_at ASC
 	`
 
-	rows, err := db.conn.Query(query, since)
+	rows, err := db.conn.Query(query, since, since)
 	if err != nil {
 		return nil, err
 	}
