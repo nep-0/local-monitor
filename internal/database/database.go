@@ -115,14 +115,25 @@ func (db *DB) GetLatestStatuses() ([]DeviceStatus, error) {
 	var statuses []DeviceStatus
 	for rows.Next() {
 		var s DeviceStatus
+		var mac, group sql.NullString
+		var online sql.NullBool
 		var lastSeen, checkedAt sql.NullTime
 
-		err := rows.Scan(&s.ID, &s.Name, &s.IP, &s.MAC, &s.Group,
-			&s.Online, &lastSeen, &checkedAt)
+		err := rows.Scan(&s.ID, &s.Name, &s.IP, &mac, &group,
+			&online, &lastSeen, &checkedAt)
 		if err != nil {
 			return nil, err
 		}
 
+		if mac.Valid {
+			s.MAC = mac.String
+		}
+		if group.Valid {
+			s.Group = group.String
+		}
+		if online.Valid {
+			s.Online = online.Bool
+		}
 		if lastSeen.Valid {
 			s.LastSeen = lastSeen.Time
 		}
@@ -156,14 +167,21 @@ func (db *DB) GetDeviceHistory(deviceIP string, limit int) ([]DeviceStatus, erro
 	var history []DeviceStatus
 	for rows.Next() {
 		var s DeviceStatus
+		var mac, group sql.NullString
 		var lastSeen, checkedAt sql.NullTime
 
-		err := rows.Scan(&s.ID, &s.Name, &s.IP, &s.MAC, &s.Group,
+		err := rows.Scan(&s.ID, &s.Name, &s.IP, &mac, &group,
 			&s.Online, &lastSeen, &checkedAt)
 		if err != nil {
 			return nil, err
 		}
 
+		if mac.Valid {
+			s.MAC = mac.String
+		}
+		if group.Valid {
+			s.Group = group.String
+		}
 		if lastSeen.Valid {
 			s.LastSeen = lastSeen.Time
 		}
