@@ -18,6 +18,7 @@ type fakeStore struct {
 	statuses []database.DeviceStatus
 	history  []database.DeviceStatus
 	samples  []database.DeviceStatus
+	since    time.Time
 	deviceID int64
 	recorded int
 }
@@ -30,7 +31,8 @@ func (f *fakeStore) GetDeviceHistory(string, int) ([]database.DeviceStatus, erro
 	return f.history, nil
 }
 
-func (f *fakeStore) GetStatusesSince(time.Time) ([]database.DeviceStatus, error) {
+func (f *fakeStore) GetStatusesSince(since time.Time) ([]database.DeviceStatus, error) {
+	f.since = since
 	return f.samples, nil
 }
 
@@ -142,5 +144,11 @@ func TestTimelineEndpoint(t *testing.T) {
 	}
 	if len(got.Devices[0].Entries) != 2 {
 		t.Fatalf("len(got.Devices[0].Entries) = %d, want 2", len(got.Devices[0].Entries))
+	}
+	if store.since.Location() != time.UTC {
+		t.Fatalf("since location = %v, want UTC", store.since.Location())
+	}
+	if got.Since.Location() != time.UTC {
+		t.Fatalf("response since location = %v, want UTC", got.Since.Location())
 	}
 }

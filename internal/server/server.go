@@ -111,7 +111,8 @@ func (s *Server) handleTimeline(w http.ResponseWriter, r *http.Request) {
 		days = parsed
 	}
 
-	since := time.Now().Add(-time.Duration(days) * 24 * time.Hour)
+	until := time.Now().UTC()
+	since := until.Add(-time.Duration(days) * 24 * time.Hour)
 	latest, err := s.store.GetLatestStatuses()
 	if err != nil {
 		s.writeError(w, http.StatusInternalServerError, "failed to get statuses")
@@ -125,7 +126,6 @@ func (s *Server) handleTimeline(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	until := time.Now()
 	response := timelineResponse{
 		Since:   since,
 		Until:   until,

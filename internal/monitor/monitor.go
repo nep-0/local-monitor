@@ -91,7 +91,7 @@ func (m *Monitor) probeDevice(ctx context.Context, dev Device) Result {
 		}
 
 		if online {
-			now := time.Now()
+			now := time.Now().UTC()
 			result := Result{
 				Device:   dev,
 				Online:   true,

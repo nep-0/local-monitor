@@ -274,7 +274,7 @@ func (db *DB) GetStatusesSince(since time.Time) ([]DeviceStatus, error) {
 
 func (db *DB) CleanupOldRecords(olderThan time.Duration) (int64, error) {
 	query := `DELETE FROM device_status WHERE checked_at < ?`
-	result, err := db.conn.Exec(query, time.Now().Add(-olderThan))
+	result, err := db.conn.Exec(query, time.Now().UTC().Add(-olderThan))
 	if err != nil {
 		return 0, err
 	}
