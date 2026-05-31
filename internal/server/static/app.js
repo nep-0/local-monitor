@@ -110,7 +110,7 @@ function renderTimeline(timeline) {
           <strong>${escapeHTML(device.name)}</strong>
           <span>${escapeHTML(device.ip)}</span>
         </div>
-        <div><span class="status ${device.online ? "online" : "offline"}">${device.online ? "Online" : "Offline"}</span></div>
+        <div class="timeline-status"><span class="status ${device.online ? "online" : "offline"}">${device.online ? "Online" : "Offline"}</span></div>
         ${renderTimelineSVG(device, blocks)}
       </div>
     `;

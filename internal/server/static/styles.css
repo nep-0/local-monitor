@@ -324,8 +324,27 @@ main {
   }
 
   .timeline-row {
-    grid-template-columns: minmax(120px, 1fr) 82px minmax(180px, 2fr);
-    gap: 10px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "identity status"
+      "timeline timeline";
+    gap: 8px 12px;
+    padding: 10px 12px;
+  }
+
+  .timeline-identity {
+    grid-area: identity;
+  }
+
+  .timeline-status {
+    grid-area: status;
+    justify-self: end;
+  }
+
+  .timeline-track,
+  .timeline-svg {
+    grid-area: timeline;
+    min-width: 0;
   }
 
   .panel-header {
