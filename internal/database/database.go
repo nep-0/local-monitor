@@ -63,6 +63,7 @@ func (db *DB) migrate() error {
 
 	CREATE INDEX IF NOT EXISTS idx_device_status_device_id ON device_status(device_id);
 	CREATE INDEX IF NOT EXISTS idx_device_status_checked_at ON device_status(checked_at);
+	CREATE INDEX IF NOT EXISTS idx_device_status_device_checked_id ON device_status(device_id, checked_at, id);
 	`
 	_, err := db.conn.Exec(query)
 	return err
