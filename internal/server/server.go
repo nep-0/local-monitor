@@ -273,14 +273,14 @@ func buildTimelineDevices(latest []database.DeviceStatus, transitions []database
 		if !ok {
 			continue
 		}
-		start := transition.CheckedAt
+		start := transition.ChangedAt
 		if start.Before(since) {
 			start = since
 		}
 		end := until
 		for _, next := range transitions[i+1:] {
 			if next.IP == transition.IP {
-				end = next.CheckedAt
+				end = next.ChangedAt
 				break
 			}
 		}

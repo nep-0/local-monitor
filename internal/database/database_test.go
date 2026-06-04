@@ -1,6 +1,7 @@
 package database
 
 import (
+	"database/sql"
 	"path/filepath"
 	"testing"
 	"time"
@@ -43,8 +44,8 @@ func TestGetLatestStatusesReturnsDevicesWithoutStatus(t *testing.T) {
 	if statuses[0].Online {
 		t.Error("Online = true, want false for device without status")
 	}
-	if !statuses[0].CheckedAt.IsZero() {
-		t.Errorf("CheckedAt = %v, want zero time", statuses[0].CheckedAt)
+	if !statuses[0].ChangedAt.IsZero() {
+		t.Errorf("ChangedAt = %v, want zero time", statuses[0].ChangedAt)
 	}
 }
 
@@ -82,6 +83,35 @@ func TestGetLatestStatusesReturnsRecordedStatus(t *testing.T) {
 	}
 }
 
+func TestRecordStatusOnlyStoresTransitions(t *testing.T) {
+	db := newTestDB(t)
+
+	deviceID, err := db.UpsertDevice("Router", "192.168.1.1", "", "network")
+	if err != nil {
+		t.Fatalf("UpsertDevice() error = %v", err)
+	}
+
+	for _, online := range []bool{false, false, true, true, false} {
+		if err := db.RecordStatus(deviceID, online, nil); err != nil {
+			t.Fatalf("RecordStatus(%v) error = %v", online, err)
+		}
+	}
+
+	var transitionCount int
+	if err := db.conn.QueryRow(`SELECT COUNT(*) FROM device_transitions WHERE device_id = ?`, deviceID).Scan(&transitionCount); err != nil {
+		t.Fatalf("transition count query error = %v", err)
+	}
+	if transitionCount != 3 {
+		t.Fatalf("transitionCount = %d, want 3", transitionCount)
+	}
+
+	var rawTableName string
+	err = db.conn.QueryRow(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'device_status'`).Scan(&rawTableName)
+	if err != sql.ErrNoRows {
+		t.Fatalf("device_status table query error = %v, want sql.ErrNoRows", err)
+	}
+}
+
 func TestGetDeviceHistoryReturnsStatusChanges(t *testing.T) {
 	db := newTestDB(t)
 
@@ -91,9 +121,13 @@ func TestGetDeviceHistoryReturnsStatusChanges(t *testing.T) {
 	}
 
 	baseTime := time.Now().UTC().Add(-time.Hour)
-	for i, online := range []bool{false, false, true, true, false} {
-		if err := recordStatusAt(db, deviceID, online, baseTime.Add(time.Duration(i)*time.Second)); err != nil {
-			t.Fatalf("recordStatusAt(%v) error = %v", online, err)
+	sequence := []bool{false, false, true, true, false}
+	for i, online := range sequence {
+		if i > 0 && online == sequence[i-1] {
+			continue
+		}
+		if err := recordTransitionAt(db, deviceID, online, baseTime.Add(time.Duration(i)*time.Second)); err != nil {
+			t.Fatalf("recordTransitionAt(%v) error = %v", online, err)
 		}
 	}
 
@@ -122,11 +156,11 @@ func TestGetStatusesSince(t *testing.T) {
 	}
 
 	baseTime := time.Now().UTC().Add(-2 * time.Hour)
-	if err := recordStatusAt(db, deviceID, false, baseTime); err != nil {
-		t.Fatalf("recordStatusAt(false) error = %v", err)
+	if err := recordTransitionAt(db, deviceID, false, baseTime); err != nil {
+		t.Fatalf("recordTransitionAt(false) error = %v", err)
 	}
-	if err := recordStatusAt(db, deviceID, true, baseTime.Add(time.Hour)); err != nil {
-		t.Fatalf("recordStatusAt(true) error = %v", err)
+	if err := recordTransitionAt(db, deviceID, true, baseTime.Add(time.Hour)); err != nil {
+		t.Fatalf("recordTransitionAt(true) error = %v", err)
 	}
 
 	statuses, err := db.GetStatusesSince(baseTime.Add(30 * time.Minute))
@@ -145,12 +179,12 @@ func TestGetStatusesSince(t *testing.T) {
 	}
 }
 
-func recordStatusAt(db *DB, deviceID int64, online bool, checkedAt time.Time) error {
+func recordTransitionAt(db *DB, deviceID int64, online bool, changedAt time.Time) error {
 	_, err := db.conn.Exec(
-		`INSERT INTO device_status (device_id, online, checked_at) VALUES (?, ?, ?)`,
+		`INSERT INTO device_transitions (device_id, online, changed_at) VALUES (?, ?, ?)`,
 		deviceID,
 		online,
-		checkedAt,
+		changedAt,
 	)
 	return err
 }

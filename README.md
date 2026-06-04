@@ -105,13 +105,13 @@ sudo ./local-monitor -probe -json
 The tool creates two tables:
 
 - **devices**: Stores device configuration (name, IP, MAC, group)
-- **device_status**: Stores status history (online/offline, timestamps)
+- **device_transitions**: Stores online/offline status changes with timestamps
 
 ## Output Formats
 
 ### Table Format (default)
 ```
-NAME                 IP              MAC                  STATUS   LAST CHECKED
+NAME                 IP              MAC                  STATUS   LAST CHANGED
 -------------------------------------------------------------------------------------
 Router               192.168.1.1     aa:bb:cc:dd:ee:f1   online   2026-05-30 10:30:00
 NAS                  192.168.1.100   N/A                  offline  2026-05-30 10:30:00
@@ -128,7 +128,7 @@ NAS                  192.168.1.100   N/A                  offline  2026-05-30 10
     "Group": "network",
     "Online": true,
     "LastSeen": "2026-05-30T10:30:00Z",
-    "CheckedAt": "2026-05-30T10:30:00Z"
+    "ChangedAt": "2026-05-30T10:30:00Z"
   }
 ]
 ```

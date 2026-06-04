@@ -353,7 +353,7 @@ func printStatuses(statuses []database.DeviceStatus, jsonOutput bool) {
 
 	// Print table header
 	fmt.Printf("%-20s %-15s %-20s %-8s %-20s\n",
-		"NAME", "IP", "MAC", "STATUS", "LAST CHECKED")
+		"NAME", "IP", "MAC", "STATUS", "LAST CHANGED")
 	fmt.Println(strings.Repeat("-", 85))
 
 	for _, s := range statuses {
@@ -367,12 +367,12 @@ func printStatuses(statuses []database.DeviceStatus, jsonOutput bool) {
 			mac = "N/A"
 		}
 
-		lastChecked := s.CheckedAt.Format("2006-01-02 15:04:05")
-		if s.CheckedAt.IsZero() {
-			lastChecked = "never"
+		lastChanged := s.ChangedAt.Format("2006-01-02 15:04:05")
+		if s.ChangedAt.IsZero() {
+			lastChanged = "never"
 		}
 
 		fmt.Printf("%-20s %-15s %-20s %-8s %-20s\n",
-			s.Name, s.IP, mac, status, lastChecked)
+			s.Name, s.IP, mac, status, lastChanged)
 	}
 }

@@ -15,7 +15,7 @@ type DeviceStatus struct {
 	Group     string
 	Online    bool
 	LastSeen  time.Time
-	CheckedAt time.Time
+	ChangedAt time.Time
 }
 
 type DB struct {
@@ -52,18 +52,16 @@ func (db *DB) migrate() error {
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 
-	CREATE TABLE IF NOT EXISTS device_status (
+	CREATE TABLE IF NOT EXISTS device_transitions (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		device_id INTEGER NOT NULL,
 		online BOOLEAN NOT NULL,
 		last_seen DATETIME,
-		checked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		changed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		FOREIGN KEY (device_id) REFERENCES devices(id)
 	);
 
-	CREATE INDEX IF NOT EXISTS idx_device_status_device_id ON device_status(device_id);
-	CREATE INDEX IF NOT EXISTS idx_device_status_checked_at ON device_status(checked_at);
-	CREATE INDEX IF NOT EXISTS idx_device_status_device_checked_id ON device_status(device_id, checked_at, id);
+	CREATE INDEX IF NOT EXISTS idx_device_transitions_device_changed_id ON device_transitions(device_id, changed_at, id);
 	`
 	_, err := db.conn.Exec(query)
 	return err
@@ -92,23 +90,40 @@ func (db *DB) GetDeviceIDByIP(ip string) (int64, error) {
 
 func (db *DB) RecordStatus(deviceID int64, online bool, lastSeen *time.Time) error {
 	query := `
-	INSERT INTO device_status (device_id, online, last_seen, checked_at)
-	VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+	INSERT INTO device_transitions (device_id, online, last_seen, changed_at)
+	SELECT ?, ?, ?, CURRENT_TIMESTAMP
+	WHERE NOT EXISTS (
+		SELECT 1
+		FROM (
+			SELECT online
+			FROM device_transitions
+			WHERE device_id = ?
+			ORDER BY changed_at DESC, id DESC
+			LIMIT 1
+		) latest
+		WHERE latest.online = ?
+	)
 	`
-	_, err := db.conn.Exec(query, deviceID, online, lastSeen)
+	_, err := db.conn.Exec(query, deviceID, online, lastSeen, deviceID, online)
 	return err
 }
 
 func (db *DB) GetLatestStatuses() ([]DeviceStatus, error) {
 	query := `
 	SELECT d.id, d.name, d.ip, d.mac, d.[groups],
-		ds.online, ds.last_seen, ds.checked_at
+		dt.online, dt.last_seen, dt.changed_at
 	FROM devices d
 	LEFT JOIN (
-		SELECT device_id, online, last_seen, checked_at,
-			ROW_NUMBER() OVER (PARTITION BY device_id ORDER BY checked_at DESC) as rn
-		FROM device_status
-	) ds ON d.id = ds.device_id AND ds.rn = 1
+		SELECT device_id, online, last_seen, changed_at
+		FROM device_transitions current
+		WHERE id = (
+			SELECT id
+			FROM device_transitions latest
+			WHERE latest.device_id = current.device_id
+			ORDER BY changed_at DESC, id DESC
+			LIMIT 1
+		)
+	) dt ON d.id = dt.device_id
 	ORDER BY d.name
 	`
 
@@ -123,10 +138,10 @@ func (db *DB) GetLatestStatuses() ([]DeviceStatus, error) {
 		var s DeviceStatus
 		var mac, group sql.NullString
 		var online sql.NullBool
-		var lastSeen, checkedAt sql.NullTime
+		var lastSeen, changedAt sql.NullTime
 
 		err := rows.Scan(&s.ID, &s.Name, &s.IP, &mac, &group,
-			&online, &lastSeen, &checkedAt)
+			&online, &lastSeen, &changedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -143,8 +158,8 @@ func (db *DB) GetLatestStatuses() ([]DeviceStatus, error) {
 		if lastSeen.Valid {
 			s.LastSeen = lastSeen.Time
 		}
-		if checkedAt.Valid {
-			s.CheckedAt = checkedAt.Time
+		if changedAt.Valid {
+			s.ChangedAt = changedAt.Time
 		}
 
 		statuses = append(statuses, s)
@@ -156,16 +171,11 @@ func (db *DB) GetLatestStatuses() ([]DeviceStatus, error) {
 func (db *DB) GetDeviceHistory(deviceIP string, limit int) ([]DeviceStatus, error) {
 	query := `
 	SELECT d.id, d.name, d.ip, d.mac, d.[groups],
-		h.online, h.last_seen, h.checked_at
-	FROM (
-		SELECT ds.device_id, ds.online, ds.last_seen, ds.checked_at,
-			LAG(ds.online) OVER (PARTITION BY ds.device_id ORDER BY ds.checked_at ASC, ds.id ASC) as previous_online
-		FROM device_status ds
-	) h
-	JOIN devices d ON d.id = h.device_id
+		dt.online, dt.last_seen, dt.changed_at
+	FROM device_transitions dt
+	JOIN devices d ON d.id = dt.device_id
 	WHERE d.ip = ?
-		AND (h.previous_online IS NULL OR h.previous_online != h.online)
-	ORDER BY h.checked_at DESC
+	ORDER BY dt.changed_at DESC, dt.id DESC
 	LIMIT ?
 	`
 
@@ -179,10 +189,10 @@ func (db *DB) GetDeviceHistory(deviceIP string, limit int) ([]DeviceStatus, erro
 	for rows.Next() {
 		var s DeviceStatus
 		var mac, group sql.NullString
-		var lastSeen, checkedAt sql.NullTime
+		var lastSeen, changedAt sql.NullTime
 
 		err := rows.Scan(&s.ID, &s.Name, &s.IP, &mac, &group,
-			&s.Online, &lastSeen, &checkedAt)
+			&s.Online, &lastSeen, &changedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -196,8 +206,8 @@ func (db *DB) GetDeviceHistory(deviceIP string, limit int) ([]DeviceStatus, erro
 		if lastSeen.Valid {
 			s.LastSeen = lastSeen.Time
 		}
-		if checkedAt.Valid {
-			s.CheckedAt = checkedAt.Time
+		if changedAt.Valid {
+			s.ChangedAt = changedAt.Time
 		}
 
 		history = append(history, s)
@@ -209,31 +219,27 @@ func (db *DB) GetDeviceHistory(deviceIP string, limit int) ([]DeviceStatus, erro
 func (db *DB) GetStatusesSince(since time.Time) ([]DeviceStatus, error) {
 	query := `
 	WITH timeline AS (
-		SELECT device_id, online, last_seen, checked_at
-		FROM (
-			SELECT ds.device_id, ds.online, ds.last_seen, ds.checked_at,
-				ROW_NUMBER() OVER (PARTITION BY ds.device_id ORDER BY ds.checked_at DESC, ds.id DESC) as rn
-			FROM device_status ds
-			WHERE ds.checked_at < ?
+		SELECT dt.device_id, dt.online, dt.last_seen, dt.changed_at
+		FROM devices d
+		JOIN device_transitions dt ON dt.id = (
+			SELECT id
+			FROM device_transitions
+			WHERE device_id = d.id AND changed_at < ?
+			ORDER BY changed_at DESC, id DESC
+			LIMIT 1
 		)
-		WHERE rn = 1
 
 		UNION ALL
 
-		SELECT device_id, online, last_seen, checked_at
-		FROM (
-			SELECT ds.device_id, ds.online, ds.last_seen, ds.checked_at,
-				LAG(ds.online) OVER (PARTITION BY ds.device_id ORDER BY ds.checked_at ASC, ds.id ASC) as previous_online
-			FROM device_status ds
-		)
-		WHERE checked_at >= ?
-			AND (previous_online IS NULL OR previous_online != online)
+		SELECT device_id, online, last_seen, changed_at
+		FROM device_transitions
+		WHERE changed_at >= ?
 	)
 	SELECT d.id, d.name, d.ip, d.mac, d.[groups],
-		t.online, t.last_seen, t.checked_at
+		t.online, t.last_seen, t.changed_at
 	FROM timeline t
 	JOIN devices d ON d.id = t.device_id
-	ORDER BY d.name, t.checked_at ASC
+	ORDER BY d.name, t.changed_at ASC
 	`
 
 	rows, err := db.conn.Query(query, since, since)
@@ -246,10 +252,10 @@ func (db *DB) GetStatusesSince(since time.Time) ([]DeviceStatus, error) {
 	for rows.Next() {
 		var s DeviceStatus
 		var mac, group sql.NullString
-		var lastSeen, checkedAt sql.NullTime
+		var lastSeen, changedAt sql.NullTime
 
 		err := rows.Scan(&s.ID, &s.Name, &s.IP, &mac, &group,
-			&s.Online, &lastSeen, &checkedAt)
+			&s.Online, &lastSeen, &changedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -263,8 +269,8 @@ func (db *DB) GetStatusesSince(since time.Time) ([]DeviceStatus, error) {
 		if lastSeen.Valid {
 			s.LastSeen = lastSeen.Time
 		}
-		if checkedAt.Valid {
-			s.CheckedAt = checkedAt.Time
+		if changedAt.Valid {
+			s.ChangedAt = changedAt.Time
 		}
 
 		statuses = append(statuses, s)
@@ -274,10 +280,15 @@ func (db *DB) GetStatusesSince(since time.Time) ([]DeviceStatus, error) {
 }
 
 func (db *DB) CleanupOldRecords(olderThan time.Duration) (int64, error) {
-	query := `DELETE FROM device_status WHERE checked_at < ?`
-	result, err := db.conn.Exec(query, time.Now().UTC().Add(-olderThan))
+	cutoff := time.Now().UTC().Add(-olderThan)
+	transitionResult, err := db.conn.Exec(`DELETE FROM device_transitions WHERE changed_at < ?`, cutoff)
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	transitionRows, err := transitionResult.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+
+	return transitionRows, nil
 }

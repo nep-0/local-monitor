@@ -174,7 +174,7 @@ function renderHistory(history) {
   historyList.innerHTML = history.map((item) => `
     <div class="history-item">
       <span class="status ${item.Online ? "online" : "offline"}">${item.Online ? "Online" : "Offline"}</span>
-      <span>${formatDate(item.CheckedAt)}</span>
+      <span>${formatDate(item.ChangedAt)}</span>
     </div>
   `).join("");
 }

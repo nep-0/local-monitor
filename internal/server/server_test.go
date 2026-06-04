@@ -115,14 +115,14 @@ func TestProbeEndpointUnavailableWithoutProber(t *testing.T) {
 }
 
 func TestTimelineEndpoint(t *testing.T) {
-	checkedAt := time.Now().UTC().Add(-time.Hour)
+	changedAt := time.Now().UTC().Add(-time.Hour)
 	store := &fakeStore{
 		statuses: []database.DeviceStatus{
 			{ID: 1, Name: "Router", IP: "192.168.1.1", Group: "network", Online: true},
 		},
 		samples: []database.DeviceStatus{
-			{ID: 1, Name: "Router", IP: "192.168.1.1", Online: false, CheckedAt: checkedAt.Add(-time.Hour)},
-			{ID: 1, Name: "Router", IP: "192.168.1.1", Online: true, CheckedAt: checkedAt},
+			{ID: 1, Name: "Router", IP: "192.168.1.1", Online: false, ChangedAt: changedAt.Add(-time.Hour)},
+			{ID: 1, Name: "Router", IP: "192.168.1.1", Online: true, ChangedAt: changedAt},
 		},
 	}
 	srv := New(store, nil, nil, nil)
